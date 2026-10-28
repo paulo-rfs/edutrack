@@ -1,5 +1,4 @@
-
- // EDUTRACK - CONSULTA PARA RESPONSÁVEIS (PROTÓTIPO)
+// EDUTRACK - CONSULTA PARA RESPONSÁVEIS (PROTÓTIPO)
 // Para uso real é obrigatório exigir autenticação e autorização no servidor.
 const FIREBASE_URL = "https://presenciometro-escolar-default-rtdb.firebaseio.com";
 

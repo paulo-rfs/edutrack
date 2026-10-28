@@ -1,18 +1,19 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Painel de controle do sistema escolar EduTrack">
-  <title>EduTrack | Controle da escola</title>
+  <meta name="description" content="Painel EduTrack de controle escolar com ESP32 e RFID">
+  <title>EduTrack | Controle da Escola</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="js/script.js" defer></script>
 </head>
 <body>
   <header class="topo">
     <div class="container barra-topo">
-      <a class="marca" href="index.html"><span class="marca-icone">E</span>Edu<span>Track</span></a>
+      <a class="marca" href="index.html">
+        <span class="marca-icone">E</span>Edu<span>Track</span>
+      </a>
       <nav class="navegacao" aria-label="Navegação principal">
         <a class="ativo" href="index.html" aria-current="page">Painel da escola</a>
         <a href="consulta.html">Consulta de presença</a>
@@ -23,56 +24,114 @@
   <main class="container">
     <section class="apresentacao">
       <div>
-        <span class="sobretitulo">CONTROLE ESCOLAR</span>
-        <h1>Painel EduTrack</h1>
-        <p>Acompanhe os acessos registrados pela ESP32 e monitore sua catraca.</p>
+        <span class="sobretitulo">PAINEL DE CONTROLE</span>
+        <h1>EduTrack</h1>
+        <p>Monitore a ESP32, as tags RFID e os registros da catraca em tempo real.</p>
       </div>
       <div class="selo">ESP32 • RFID • Firebase</div>
     </section>
 
     <div class="aviso" role="note">
-      <strong>Protótipo de demonstração:</strong> este painel não possui login. Não publique dados reais de alunos antes de implementar autenticação e regras de acesso no Firebase.
+      <strong>Protótipo:</strong> não utilize dados reais de alunos sem autenticação
+      e regras de acesso apropriadas no Firebase.
     </div>
 
-    <section class="metricas" aria-label="Resumo dos registros carregados">
-      <article class="cartao metrica"><span>Registros carregados</span><strong id="totalRegistros">—</strong><small>Até os 200 mais recentes</small></article>
-      <article class="cartao metrica"><span>Autorizados</span><strong id="totalAutorizados">—</strong><small>Acessos permitidos</small></article>
-      <article class="cartao metrica"><span>Negados</span><strong id="totalNegados">—</strong><small>Tags não cadastradas</small></article>
-      <article class="cartao metrica"><span>Última pessoa</span><strong id="ultimoAcesso" class="nome-metrica">—</strong><small>Registro mais recente</small></article>
+    <section class="metricas" aria-label="Resumo dos registros do Firebase">
+      <article class="cartao metrica">
+        <span>Registros carregados</span><strong id="totalRegistros">—</strong>
+        <small>Até os 200 mais recentes</small>
+      </article>
+      <article class="cartao metrica">
+        <span>Autorizados</span><strong id="totalAutorizados">—</strong>
+        <small>Acessos permitidos</small>
+      </article>
+      <article class="cartao metrica">
+        <span>Negados</span><strong id="totalNegados">—</strong>
+        <small>Tags desconhecidas</small>
+      </article>
+      <article class="cartao metrica">
+        <span>Última pessoa</span><strong id="ultimoAcesso" class="nome-metrica">—</strong>
+        <small>Último registro no Firebase</small>
+      </article>
     </section>
 
     <section class="grade-paineis" aria-label="Estado das conexões">
       <article class="cartao painel">
-        <div class="painel-cabecalho"><h2>Banco de dados</h2><span id="statusFirebase" class="indicador">Verificando...</span></div>
-        <p>Os registros são atualizados automaticamente a cada 3 segundos.</p>
-        <div class="linha-acoes"><button id="btnAtualizar" class="botao" type="button">Atualizar agora</button><span id="atualizadoEm" class="texto-suave">Ainda não atualizado</span></div>
+        <div class="painel-cabecalho">
+          <h2>Firebase</h2>
+          <span id="statusFirebase" class="indicador">Verificando...</span>
+        </div>
+        <p>Atualização automática dos registros a cada 3 segundos.</p>
+        <div class="linha-acoes">
+          <button id="btnAtualizar" class="botao" type="button">Atualizar registros</button>
+          <span id="atualizadoEm" class="texto-suave">Aguardando...</span>
+        </div>
       </article>
-      <article class="cartao painel">
-        <div class="painel-cabecalho"><h2>Monitor serial da ESP32</h2><span id="statusSerial" class="indicador">Desconectado</span></div>
-        <p>Opcional: acompanhe as mensagens da ESP32 pelo Chrome ou Edge.</p>
-        <div class="linha-acoes"><button id="btnConectar" class="botao" type="button">Conectar ESP32</button><button id="btnDesconectar" class="botao botao-secundario" type="button" disabled>Desconectar</button></div>
+
+      <article class="cartao painel painel-conexao">
+        <div class="painel-cabecalho">
+          <h2>Conexão com a ESP32</h2>
+          <span id="statusSerial" class="indicador" role="status">Desconectado</span>
+        </div>
+        <p id="mensagemSerial">Conecte o USB e clique em “Conectar ESP32” para escolher a porta COM.</p>
+        <p class="porta-conectada">Porta: <strong id="nomePortaSerial">Nenhuma selecionada</strong></p>
+        <div class="linha-acoes">
+          <button id="btnConectar" class="botao" type="button">Conectar ESP32</button>
+          <button id="btnReconectar" class="botao botao-secundario" type="button">Reconectar</button>
+          <button id="btnDesconectar" class="botao botao-secundario" type="button" disabled>Desconectar</button>
+        </div>
+        <p class="dica-serial">Use Chrome ou Edge no computador e Live Server (localhost). Feche o Monitor Serial da Arduino IDE antes de conectar.</p>
       </article>
     </section>
 
+    <section class="cartao painel leitura-ao-vivo" aria-label="Último evento da porta serial">
+      <div class="secao-titulo">
+        <div><h2>Leitura RFID ao vivo</h2><p>Dados recebidos pela porta serial da ESP32.</p></div>
+        <span id="statusCatraca" class="indicador">Catraca: aguardando</span>
+      </div>
+      <div class="ao-vivo-dados">
+        <div><span>Última tag</span><strong id="ultimaTagSerial">Aguardando leitura...</strong></div>
+        <div><span>UID</span><strong id="ultimoUidSerial">—</strong></div>
+        <div><span>Resultado</span><strong id="ultimoStatusSerial">—</strong></div>
+      </div>
+    </section>
+
     <section class="cartao secao-tabela">
-      <div class="secao-titulo"><div><h2>Histórico de acessos</h2><p>Consulte os últimos eventos recebidos pelo Firebase.</p></div></div>
+      <div class="secao-titulo">
+        <div><h2>Histórico de acessos</h2><p>Eventos armazenados no Firebase.</p></div>
+      </div>
       <div class="filtros">
-        <label class="campo">Buscar por nome ou UID<input id="filtroBusca" type="search" placeholder="Ex.: Gabriel ou A3 77 2B 14" autocomplete="off"></label>
-        <label class="campo">Situação<select id="filtroStatus"><option value="TODOS">Todos</option><option value="AUTORIZADO">Autorizados</option><option value="NEGADO">Negados</option></select></label>
+        <label class="campo">Buscar por nome ou UID
+          <input id="filtroBusca" type="search" placeholder="Ex.: Gabriel ou A3 77 2B 14" autocomplete="off">
+        </label>
+        <label class="campo">Situação
+          <select id="filtroStatus">
+            <option value="TODOS">Todos</option>
+            <option value="AUTORIZADO">Autorizados</option>
+            <option value="NEGADO">Negados</option>
+          </select>
+        </label>
       </div>
       <div class="tabela-scroll">
         <table>
-          <thead><tr><th>Data e hora</th><th>Nome</th><th>Identificação (UID)</th><th>Tipo</th><th>Situação</th></tr></thead>
-          <tbody id="tabelaRegistros"><tr><td colspan="5" class="vazio">Carregando registros...</td></tr></tbody>
+          <thead>
+            <tr><th>Data e hora</th><th>Nome</th><th>UID</th><th>Tipo</th><th>Situação</th></tr>
+          </thead>
+          <tbody id="tabelaRegistros">
+            <tr><td colspan="5" class="vazio">Carregando registros...</td></tr>
+          </tbody>
         </table>
       </div>
       <p class="rodape-tabela" id="infoTabela" aria-live="polite">Aguardando dados...</p>
     </section>
 
     <section class="cartao painel painel-serial">
-      <div class="painel-cabecalho"><h2>Mensagens da ESP32</h2><button id="btnLimparLog" class="botao botao-secundario" type="button">Limpar mensagens</button></div>
-      <pre id="logSerial" class="terminal" aria-live="off">Conecte a ESP32 para visualizar as mensagens aqui.</pre>
-      <p class="texto-suave">A porta serial apenas exibe mensagens. A própria ESP32 envia os registros ao Firebase, sem duplicá-los pelo navegador.</p>
+      <div class="painel-cabecalho">
+        <h2>Monitor Serial — 115200 baud</h2>
+        <button id="btnLimparLog" class="botao botao-secundario" type="button">Limpar monitor</button>
+      </div>
+      <pre id="logSerial" class="terminal">Clique em "Conectar ESP32" para ver as mensagens recebidas.</pre>
+      <p class="texto-suave">O monitor só mostra o que a ESP32 envia pela USB. Os registros continuam sendo enviados pela própria ESP32 ao Firebase via Wi-Fi.</p>
     </section>
   </main>
 
