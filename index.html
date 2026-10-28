@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Presenca - Escola</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><i class="fas fa-school"></i> Controle de Presenca</h1>
+      <p>Sistema de gerenciamento de presenca escolar com tags NFC</p>
+      <div id="firebase-status" style="font-size:0.9rem;background:rgba(255,255,255,0.2);padding:8px 15px;border-radius:5px;margin-top:10px;color:#fff;">
+        Conectando ao Firebase...
+      </div>
+    </header>
+
+    <div class="status-bar">
+      <div id="connectionStatus">
+        <i class="fas fa-circle" style="color: #e74c3c;"></i> Desconectado
+      </div>
+      <button id="connectBtn" class="btn btn-success">
+        <i class="fas fa-plug"></i> Conectar ao Arduino
+      </button>
+    </div>
+
+    <div class="dashboard">
+      <div class="card">
+        <h3><i class="fas fa-user-check"></i> Ultimo Registro</h3>
+        <div id="ultimoAcesso">
+          <p style="color: #999;">Nenhum registro</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-door-open"></i> Status da Porta</h3>
+        <div id="statusPorta">
+          <p style="color: #2ecc71;"> Porta FECHADA</p>
+        </div>
+        <button id="togglePortaBtn" class="btn btn-warning" disabled>
+          <i class="fas fa-unlock"></i> Abrir Porta
+        </button>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-chart-bar"></i> Estatisticas</h3>
+        <div id="estatisticas">
+          <p><strong>Total de registros:</strong> <span id="totalAcessos">0</span></p>
+          <p><strong>Alunos cadastrados:</strong> <span id="totalTags">0</span></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="logs-section">
+      <div class="logs-header">
+        <h2><i class="fas fa-history"></i> Historico</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button id="limparLogsBtn" class="btn btn-danger">
+            <i class="fas fa-trash"></i> Limpar Historico
+          </button>
+          <button id="limparFirebaseBtn" class="btn btn-danger" style="background:#c0392b;color:white;">
+            <i class="fas fa-database"></i> Limpar Banco de Dados
+          </button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Nome</th><th>UID</th><th>Data/Hora</th><th>Status</th></tr>
+        </thead>
+        <tbody id="logsBody">
+          <tr><td colspan="5" style="text-align:center;color:#999;">Nenhum registro</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tags-section">
+      <h2><i class="fas fa-users"></i> Cadastrar Aluno</h2>
+      <div class="tags-control">
+        <input type="text" id="novaTagUid" placeholder="UID (ex: A3 77 2B 14)" />
+        <input type="text" id="novaTagNome" placeholder="Nome do aluno" />
+        <button id="addTagBtn" class="btn btn-success"><i class="fas fa-user-plus"></i> Cadastrar</button>
+      </div>
+      <div id="tagsList">
+        <p style="color: #999;">Nenhum aluno cadastrado</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/script.js"></script>
+</body>
+</html>
