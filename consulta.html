@@ -1,0 +1,56 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Consulta de registros de acesso do EduTrack">
+  <title>EduTrack | Consulta de presença</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/consulta-script.js" defer></script>
+</head>
+<body>
+  <header class="topo">
+    <div class="container barra-topo">
+      <a class="marca" href="index.html"><span class="marca-icone">E</span>Edu<span>Track</span></a>
+      <nav class="navegacao" aria-label="Navegação principal">
+        <a href="index.html">Painel da escola</a>
+        <a class="ativo" href="consulta.html" aria-current="page">Consulta de presença</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container conteudo-consulta">
+    <section class="apresentacao">
+      <div>
+        <span class="sobretitulo">ACOMPANHAMENTO ESCOLAR</span>
+        <h1>Consulta de acessos</h1>
+        <p>Verifique os registros feitos pela catraca com a tag RFID.</p>
+      </div>
+      <div class="selo">Consulta EduTrack</div>
+    </section>
+
+    <div class="aviso" role="note"><strong>Ambiente de demonstração:</strong> a busca por nome ou UID não substitui login e autorização dos responsáveis. Para uso real, proteja os dados dos estudantes.</div>
+
+    <section class="cartao bloco-consulta">
+      <h2>Localizar registros</h2>
+      <p>Digite o nome completo cadastrado ou o UID da tag. A pesquisa exige correspondência exata.</p>
+      <form id="formConsulta" class="form-consulta">
+        <label class="campo" for="buscaAluno">Nome completo ou UID<input id="buscaAluno" type="search" placeholder="Ex.: Gabriel ou A3 77 2B 14" required autocomplete="off" maxlength="120"></label>
+        <button class="botao" type="submit" id="btnConsultar">Consultar</button>
+      </form>
+      <p id="statusConsulta" class="texto-suave" role="status">Preencha a busca para consultar um registro.</p>
+    </section>
+
+    <section class="cartao resultados">
+      <div class="secao-titulo"><div><h2>Resultado da consulta</h2><p id="resumoConsulta">Nenhuma pesquisa realizada.</p></div></div>
+      <div id="resultadoConsulta" class="lista-registros" aria-live="polite">
+        <div class="estado-vazio">Os registros encontrados aparecerão aqui.</div>
+      </div>
+      <p class="texto-suave">“Autorizado” significa que a tag foi aceita pelo leitor. Sem um sensor de direção, o sistema ainda não distingue entrada de saída.</p>
+    </section>
+  </main>
+
+  <footer class="rodape">EduTrack — Conectando escolas, alunos e famílias com inteligência e segurança.</footer>
+</body>
+</html>
