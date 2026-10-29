@@ -1,280 +1,105 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Painel EduTrack de controle escolar com ESP32 e RFID">
-  <title>EduTrack | Controle da Escola</title>
-  <style>
-:root {
-  color-scheme: light;
-  --fundo: #f1f5fa;
-  --cartao: #ffffff;
-  --texto: #14263d;
-  --suave: #66778c;
-  --azul: #2563eb;
-  --azul-escuro: #174bb6;
-  --borda: #dfe7f0;
-  --verde: #15803d;
-  --vermelho: #b42318;
-  --sombra: 0 8px 28px rgba(24, 48, 83, .055);
-}
-
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-a { color: inherit; }
-button, input, select { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .55; }
-.container { width: min(1160px, calc(100% - 36px)); margin: 0 auto; }
-
-.topo { background: #fff; border-bottom: 1px solid var(--borda); }
-.barra-topo { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 78px; }
-.marca { display: inline-flex; align-items: center; gap: 3px; text-decoration: none; font-size: 23px; font-weight: 800; letter-spacing: -.8px; white-space: nowrap; }
-.marca > span:last-child { color: var(--azul); }
-.marca-icone { display: grid; place-items: center; width: 37px; height: 37px; margin-right: 8px; border-radius: 11px; background: var(--azul); color: #fff; font-size: 21px; }
-.navegacao { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
-.navegacao a { color: var(--suave); text-decoration: none; font-size: 14px; font-weight: 650; padding: 10px 13px; border-radius: 9px; }
-.navegacao a:hover, .navegacao a.ativo { color: var(--azul); background: #eaf1ff; }
-
-.apresentacao { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 44px 0 28px; }
-.sobretitulo { font-size: 12px; color: var(--azul); font-weight: 800; letter-spacing: 1.6px; }
-h1 { margin: 4px 0 8px; font-size: clamp(30px, 4vw, 43px); line-height: 1.15; letter-spacing: -1.2px; }
-h2 { font-size: 19px; letter-spacing: -.3px; margin: 0 0 6px; }
-p { margin: 0; }
-.apresentacao p, .painel p, .bloco-consulta > p, .secao-titulo p { color: var(--suave); }
-.selo { background: #e5efff; color: #1a50a7; border: 1px solid #cbdcf9; border-radius: 30px; padding: 9px 16px; font-weight: 750; font-size: 13px; white-space: nowrap; }
-.aviso { border: 1px solid #f2d88e; background: #fff9e8; border-radius: 12px; color: #745214; padding: 13px 17px; margin-bottom: 22px; font-size: 14px; }
-.cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; box-shadow: var(--sombra); }
-
-.metricas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
-.metrica { display: flex; flex-direction: column; min-height: 144px; padding: 22px; }
-.metrica > span { color: var(--suave); font-size: 14px; font-weight: 600; }
-.metrica strong { font-size: 37px; margin-top: 5px; letter-spacing: -1.5px; line-height: 1.25; }
-.metrica .nome-metrica { font-size: 24px; overflow-wrap: anywhere; letter-spacing: -.6px; }
-.metrica small { color: var(--suave); margin-top: auto; padding-top: 8px; }
-.grade-paineis { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
-.painel { padding: 23px; }
-.painel-cabecalho, .secao-titulo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.painel-cabecalho { margin-bottom: 8px; }
-.painel p { font-size: 14px; }
-.indicador { display: inline-block; border-radius: 25px; background: #edf1f6; color: #526276; font-weight: 700; font-size: 12px; padding: 6px 10px; white-space: nowrap; }
-.indicador.ok { background: #dcfce7; color: #166534; }
-.indicador.erro { background: #fee7e5; color: #b42318; }
-.linha-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
-.botao { display: inline-flex; justify-content: center; align-items: center; border: 1px solid var(--azul); border-radius: 9px; background: var(--azul); color: #fff; padding: 10px 15px; font-size: 14px; font-weight: 750; text-decoration: none; transition: background .15s ease; }
-.botao:hover:not(:disabled) { background: var(--azul-escuro); }
-.botao-secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
-.botao-secundario:hover:not(:disabled) { background: #f4f7fb; }
- .texto-suave { color: var(--suave); font-size: 13px; }
-.botao-perigo { background: #b42318; border-color: #b42318; }
-.botao-perigo:hover:not(:disabled) { background: #8f1d14; }
-.acoes-historico { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-
-
-.secao-tabela { padding: 24px; margin-bottom: 18px; }
-.secao-titulo { margin-bottom: 21px; }
-.secao-titulo p { font-size: 14px; }
-.filtros { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 18px; }
-.campo { display: flex; flex-direction: column; gap: 7px; font-weight: 650; font-size: 13px; }
-.campo input, .campo select { width: 100%; height: 44px; border: 1px solid #cbd6e3; border-radius: 9px; background: #fff; color: var(--texto); padding: 0 12px; outline: none; }
-.campo input:focus, .campo select:focus { border-color: var(--azul); box-shadow: 0 0 0 3px #dbeafe; }
-.tabela-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 680px; }
-th { color: #53667b; background: #f6f9fc; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; padding: 13px 12px; }
-td { border-bottom: 1px solid #ebf0f5; padding: 14px 12px; font-size: 14px; }
-tr:last-child td { border-bottom: 0; }
-.vazio { text-align: center; color: var(--suave); padding: 34px 12px; }
-.etiqueta { display: inline-block; border-radius: 25px; font-size: 12px; font-weight: 800; padding: 5px 10px; }
-.etiqueta.autorizado { color: var(--verde); background: #dcfce7; }
-.etiqueta.negado { color: var(--vermelho); background: #fee7e5; }
-.etiqueta.outro { color: #50637a; background: #ebf0f6; }
-.rodape-tabela { font-size: 13px; color: var(--suave); margin-top: 15px; }
-.painel-serial { margin-bottom: 36px; }
-.terminal { background: #101d30; color: #d4f5db; border-radius: 10px; font-size: 12px; line-height: 1.65; padding: 17px; min-height: 130px; max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 14px 0 10px; }
-.rodape { color: var(--suave); text-align: center; font-size: 13px; padding: 24px 18px 35px; }
-
-.conteudo-consulta { max-width: 850px; }
-.bloco-consulta, .resultados { padding: 26px; margin-bottom: 20px; }
-.bloco-consulta > p { font-size: 14px; margin-bottom: 22px; }
-.form-consulta { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; margin-bottom: 12px; }
-.form-consulta .botao { height: 44px; }
-.lista-registros { display: grid; gap: 12px; margin-bottom: 18px; }
-.item-registro { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--borda); border-radius: 12px; padding: 17px; }
-.item-registro strong { display: block; }
-.item-registro .detalhes { color: var(--suave); font-size: 13px; margin-top: 5px; overflow-wrap: anywhere; }
-.estado-vazio { color: var(--suave); text-align: center; border: 1px dashed var(--borda); padding: 30px 14px; border-radius: 12px; }
-.resultados > .texto-suave { border-top: 1px solid var(--borda); padding-top: 16px; }
-
-@media (max-width: 850px) {
-  .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grade-paineis { grid-template-columns: 1fr; }
-}
-@media (max-width: 560px) {
-  .barra-topo, .apresentacao { flex-direction: column; align-items: flex-start; }
-  .barra-topo { padding: 15px 0; gap: 12px; }
-  .navegacao { width: 100%; }
-  .navegacao a { padding: 9px 10px; font-size: 13px; }
-  .apresentacao { gap: 14px; padding: 27px 0 20px; }
-  .metricas { gap: 10px; }
-  .metrica { min-height: 132px; padding: 16px; }
-  .metrica strong { font-size: 30px; }
-  .metrica .nome-metrica { font-size: 19px; }
-  .painel, .secao-tabela, .bloco-consulta, .resultados { padding: 18px; }
-  .painel-cabecalho { flex-wrap: wrap; }
-  .filtros, .form-consulta { grid-template-columns: 1fr; }
-  .form-consulta .botao { width: 100%; }
-  .item-registro { align-items: flex-start; flex-direction: column; }
-}
-
-/* EDU TRACK - CONEXAO USB E LEITURA AO VIVO */
-.painel-conexao .porta-conectada {
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--suave);
-}
-.painel-conexao .porta-conectada strong { color: var(--texto); }
-.painel-conexao .dica-serial {
-  margin-top: 14px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--suave);
-}
-.leitura-ao-vivo { margin-bottom: 18px; }
-.ao-vivo-dados {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  margin-top: 15px;
-}
-.ao-vivo-dados > div { background: #f6f9fc; border: 1px solid var(--borda); border-radius: 12px; padding: 16px; min-width: 0; }
-.ao-vivo-dados span { display: block; color: var(--suave); font-size: 13px; margin-bottom: 6px; }
-.ao-vivo-dados strong { display: block; font-size: 16px; overflow-wrap: anywhere; }
-@media (max-width: 640px) {
-  .ao-vivo-dados { grid-template-columns: 1fr; }
-  .ao-vivo-dados > div { padding: 13px; }
-}
-
-/* DIAGNOSTICO DO CODESPACES */
-.diagnostico { margin-bottom: 18px; }
-.diagnostico #erroDetalhado { margin-top: 9px; overflow-wrap: anywhere; }
-.diagnostico .linha-acoes { margin-top: 16px; }
-
-</style>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EduTrack | Painel da Escola</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
   <header class="topo">
-    <div class="container barra-topo">
-      <a class="marca" href="index.html">
-        <span class="marca-icone">E</span>Edu<span>Track</span>
-      </a>
-      <nav class="navegacao" aria-label="Navegação principal">
-        <a class="ativo" href="index.html" aria-current="page">Painel da escola</a>
+    <div class="container topo-interno">
+      <a class="logo" href="index.html">🎓 Edu<span>Track</span></a>
+      <nav>
+        <a class="selecionado" href="index.html">Painel da escola</a>
         <a href="consulta.html">Consulta de presença</a>
       </nav>
     </div>
   </header>
 
   <main class="container">
-    <section class="apresentacao">
+    <section class="cabecalho">
       <div>
-        <span class="sobretitulo">PAINEL DE CONTROLE</span>
-        <h1>EduTrack</h1>
-        <p>Monitore a ESP32, as tags RFID e os registros da catraca em tempo real.</p>
+        <p class="sobre">SISTEMA INTELIGENTE DE PRESENÇA ESCOLAR</p>
+        <h1>Painel EduTrack</h1>
+        <p>Monitore a catraca, a ESP32 e os registros de acesso.</p>
       </div>
-      <div class="selo">ESP32 • RFID • Firebase</div>
+      <span class="etiqueta-topo">ESP32 • RFID • Firebase</span>
     </section>
 
-    <div class="aviso" role="note">
-      <strong>Protótipo:</strong> não utilize dados reais de alunos sem autenticação
-      e regras de acesso apropriadas no Firebase.
+    <div class="aviso">
+      <strong>Protótipo escolar:</strong>
+      este painel não possui autenticação. Não publique dados reais
+      de estudantes nem permita acesso público ao banco antes de
+      implementar login e regras de segurança.
     </div>
 
-    <section class="cartao painel diagnostico" aria-label="Diagnóstico do sistema">
-      <div class="painel-cabecalho"><h2>Diagnóstico de conexão</h2><span id="statusJavaScript" class="indicador">JavaScript não iniciado</span></div>
-      <p id="statusAmbiente" role="status">Verificando como o site foi aberto...</p>
-      <p id="erroDetalhado" class="texto-suave" role="status">Quando ocorrer um erro de Firebase ou USB, ele será exibido aqui.</p>
-      <div class="linha-acoes">
-        <button id="btnDiagnosticar" class="botao botao-secundario" type="button">Testar conexões</button>
-        <a id="linkAbaExterna" class="botao" href="#" target="_blank" rel="noopener noreferrer">Abrir site em outra aba</a>
-      </div>
-    </section>
-
-    <section class="metricas" aria-label="Resumo dos registros do Firebase">
-      <article class="cartao metrica">
-        <span>Registros carregados</span><strong id="totalRegistros">—</strong>
-        <small>Até os 200 mais recentes</small>
+    <section class="resumo">
+      <article class="cartao indicador-grande">
+        <span>Registros</span>
+        <strong id="totalRegistros">0</strong>
       </article>
-      <article class="cartao metrica">
-        <span>Autorizados</span><strong id="totalAutorizados">—</strong>
-        <small>Acessos permitidos</small>
+      <article class="cartao indicador-grande">
+        <span>Autorizados</span>
+        <strong id="totalAutorizados">0</strong>
       </article>
-      <article class="cartao metrica">
-        <span>Negados</span><strong id="totalNegados">—</strong>
-        <small>Tags desconhecidas</small>
+      <article class="cartao indicador-grande">
+        <span>Negados</span>
+        <strong id="totalNegados">0</strong>
       </article>
-      <article class="cartao metrica">
-        <span>Última pessoa</span><strong id="ultimoAcesso" class="nome-metrica">—</strong>
-        <small>Último registro no Firebase</small>
+      <article class="cartao indicador-grande">
+        <span>Último acesso</span>
+        <strong class="nome" id="ultimoAcesso">—</strong>
       </article>
     </section>
 
-    <section class="grade-paineis" aria-label="Estado das conexões">
+    <section class="duas-colunas">
       <article class="cartao painel">
-        <div class="painel-cabecalho">
-          <h2>Firebase</h2>
-          <span id="statusFirebase" class="indicador">Verificando...</span>
+        <div class="titulo-linha">
+          <h2>☁️ Firebase</h2>
+          <span class="status" id="statusFirebase">Verificando...</span>
         </div>
-        <p>Atualização automática dos registros a cada 3 segundos.</p>
-        <div class="linha-acoes">
-          <button id="btnAtualizar" class="botao" type="button">Atualizar registros</button>
-          <span id="atualizadoEm" class="texto-suave">Aguardando...</span>
+        <p>O histórico é atualizado a cada 3 segundos.</p>
+        <div class="acoes">
+          <button id="btnAtualizar" type="button">Atualizar agora</button>
+          <small id="atualizadoEm">Aguardando...</small>
         </div>
       </article>
 
-      <article class="cartao painel painel-conexao">
-        <div class="painel-cabecalho">
-          <h2>Conexão com a ESP32</h2>
-          <span id="statusSerial" class="indicador" role="status">Desconectado</span>
+      <article class="cartao painel">
+        <div class="titulo-linha">
+          <h2>🔌 ESP32 via USB</h2>
+          <span class="status" id="statusSerial">Desconectada</span>
         </div>
-        <p id="mensagemSerial">Conecte o USB e clique em “Conectar ESP32” para escolher a porta COM.</p>
-        <p class="porta-conectada">Porta: <strong id="nomePortaSerial">Nenhuma selecionada</strong></p>
-        <div class="linha-acoes">
-          <button id="btnConectar" class="botao" type="button">Conectar ESP32</button>
-          <button id="btnReconectar" class="botao botao-secundario" type="button">Reconectar</button>
-          <button id="btnDesconectar" class="botao botao-secundario" type="button" disabled>Desconectar</button>
+        <p>Use o Chrome ou Edge em uma aba normal, com a ESP32 ligada por cabo USB.</p>
+        <div class="acoes">
+          <button id="btnConectar" type="button">Conectar ESP32</button>
+          <button id="btnDesconectar" type="button" class="secundario" disabled>Desconectar</button>
         </div>
-        <p class="dica-serial">Use Chrome/Edge no computador e abra a página em aba própria (fora da prévia do VS Code). Feche o Monitor Serial da Arduino IDE antes de conectar.</p>
       </article>
     </section>
 
-    <section class="cartao painel leitura-ao-vivo" aria-label="Último evento da porta serial">
-      <div class="secao-titulo">
-        <div><h2>Leitura RFID ao vivo</h2><p>Dados recebidos pela porta serial da ESP32.</p></div>
-        <span id="statusCatraca" class="indicador">Catraca: aguardando</span>
+    <section class="cartao painel">
+      <div class="titulo-linha">
+        <h2>📋 Histórico de acessos</h2>
+        <button id="btnLimparHistorico" type="button" class="perigo">
+          🗑 Limpar histórico
+        </button>
       </div>
-      <div class="ao-vivo-dados">
-        <div><span>Última tag</span><strong id="ultimaTagSerial">Aguardando leitura...</strong></div>
-        <div><span>UID</span><strong id="ultimoUidSerial">—</strong></div>
-        <div><span>Resultado</span><strong id="ultimoStatusSerial">—</strong></div>
-      </div>
-    </section>
+      <p class="observacao">
+        O botão vermelho exclui os registros do Firebase,
+        e não apenas da tela. A exclusão exige confirmação.
+      </p>
 
-    <section class="cartao secao-tabela">
-      <div class="secao-titulo">
-        <div><h2>Histórico de acessos</h2><p>Eventos armazenados no Firebase.</p></div>
-        <div class="acoes-historico">
-          <button id="btnApagarHistorico" class="botao botao-perigo" type="button" title="Excluir todos os registros armazenados no Firebase">Limpar histórico</button>
-        </div>
-      </div>
-      <p id="mensagemLimpeza" class="texto-suave" role="status" aria-live="polite" style="margin-bottom:14px">A exclusão apaga os registros do Firebase e também os remove do site de consulta.</p>
       <div class="filtros">
-        <label class="campo">Buscar por nome ou UID
-          <input id="filtroBusca" type="search" placeholder="Ex.: Gabriel ou A3 77 2B 14" autocomplete="off">
+        <label>
+          Buscar por nome ou UID
+          <input id="filtroBusca" type="search" placeholder="Digite o nome ou UID">
         </label>
-        <label class="campo">Situação
+        <label>
+          Status
           <select id="filtroStatus">
             <option value="TODOS">Todos</option>
             <option value="AUTORIZADO">Autorizados</option>
@@ -282,549 +107,46 @@ tr:last-child td { border-bottom: 0; }
           </select>
         </label>
       </div>
-      <div class="tabela-scroll">
+
+      <div class="tabela-rolagem">
         <table>
           <thead>
-            <tr><th>Data e hora</th><th>Nome</th><th>UID</th><th>Tipo</th><th>Situação</th></tr>
+            <tr>
+              <th>Data e hora</th>
+              <th>Nome</th>
+              <th>UID</th>
+              <th>Tipo</th>
+              <th>Status</th>
+            </tr>
           </thead>
           <tbody id="tabelaRegistros">
-            <tr><td colspan="5" class="vazio">Carregando registros...</td></tr>
+            <tr>
+              <td colspan="5" class="vazio">Carregando registros...</td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <p class="rodape-tabela" id="infoTabela" aria-live="polite">Aguardando dados...</p>
+      <p id="infoTabela" class="observacao" role="status"></p>
     </section>
 
-    <section class="cartao painel painel-serial">
-      <div class="painel-cabecalho">
-        <h2>Monitor Serial — 115200 baud</h2>
-        <button id="btnLimparLog" class="botao botao-secundario" type="button">Limpar monitor</button>
+    <section class="cartao painel">
+      <div class="titulo-linha">
+        <h2>📟 Monitor Serial da ESP32</h2>
+        <button id="btnLimparLog" type="button" class="secundario">
+          Limpar mensagens
+        </button>
       </div>
-      <pre id="logSerial" class="terminal">Clique em "Conectar ESP32" para ver as mensagens recebidas.</pre>
-      <p class="texto-suave">O monitor só mostra o que a ESP32 envia pela USB. Os registros continuam sendo enviados pela própria ESP32 ao Firebase via Wi-Fi.</p>
+      <pre id="logSerial" class="terminal">Aguardando conexão com a ESP32...</pre>
+      <p class="observacao">
+        O monitor mostra as mensagens da placa.
+        É a própria ESP32 que envia os registros ao Firebase.
+      </p>
+      <p id="mensagemSistema" class="mensagem" role="status"></p>
     </section>
   </main>
 
-  <footer class="rodape">EduTrack — Conectando escolas, alunos e famílias com inteligência e segurança.</footer>
-<script>
-// ==========================================================
-// EDUTRACK - PAINEL DA ESCOLA (VS CODE / LIVE SERVER)
-// Web Serial: Chrome ou Edge, em localhost ou HTTPS.
-// ==========================================================
-const FIREBASE_URL = "https://presenciometro-escolar-default-rtdb.firebaseio.com";
-const INTERVALO_ATUALIZACAO = 3000;
-const LIMITE_REGISTROS = 200;
-const BAUD_RATE = 115200; // Mesmo valor de Serial.begin(115200) na ESP32
-
-const el = {
-  tabela: document.getElementById("tabelaRegistros"),
-  busca: document.getElementById("filtroBusca"),
-  filtro: document.getElementById("filtroStatus"),
-  total: document.getElementById("totalRegistros"),
-  autorizados: document.getElementById("totalAutorizados"),
-  negados: document.getElementById("totalNegados"),
-  ultimo: document.getElementById("ultimoAcesso"),
-  firebase: document.getElementById("statusFirebase"),
-  atualizado: document.getElementById("atualizadoEm"),
-  info: document.getElementById("infoTabela"),
-  atualizar: document.getElementById("btnAtualizar"),
-  apagarHistorico: document.getElementById("btnApagarHistorico"),
-  mensagemLimpeza: document.getElementById("mensagemLimpeza"),
-  conectar: document.getElementById("btnConectar"),
-  reconectar: document.getElementById("btnReconectar"),
-  desconectar: document.getElementById("btnDesconectar"),
-  serial: document.getElementById("statusSerial"),
-  mensagemSerial: document.getElementById("mensagemSerial"),
-  nomePorta: document.getElementById("nomePortaSerial"),
-  log: document.getElementById("logSerial"),
-  limparLog: document.getElementById("btnLimparLog"),
-  statusJS: document.getElementById("statusJavaScript"),
-  statusAmbiente: document.getElementById("statusAmbiente"),
-  erroDetalhado: document.getElementById("erroDetalhado"),
-  diagnosticar: document.getElementById("btnDiagnosticar"),
-  abaExterna: document.getElementById("linkAbaExterna"),
-  ultimaTag: document.getElementById("ultimaTagSerial"),
-  ultimoUID: document.getElementById("ultimoUidSerial"),
-  ultimoStatus: document.getElementById("ultimoStatusSerial"),
-  catraca: document.getElementById("statusCatraca")
-};
-
-let registros = [];
-let atualizando = false;
-let apagandoHistorico = false;
-let versaoHistorico = 0;
-let portaSerial = null;
-let leitorSerial = null;
-let tarefaLeitura = null;
-let pararLeitura = false;
-let conectando = false;
-let desconectando = false;
-let logLinhas = [];
-
-// ==========================================================
-// FIREBASE / HISTORICO
-// ==========================================================
-function avisarErro(mensagem) {
-  el.erroDetalhado.textContent = mensagem;
-}
-
-function estaEmPreview() {
-  return window.self !== window.top;
-}
-
-function politicaPermiteSerial() {
-  try {
-    const politica = document.permissionsPolicy || document.featurePolicy;
-    return !politica?.allowsFeature || politica.allowsFeature("serial");
-  } catch (_erro) {
-    return true;
-  }
-}
-
-function atualizarDiagnosticoAmbiente() {
-  const seguro = window.isSecureContext;
-  const serial = "serial" in navigator;
-  const enquadrado = estaEmPreview();
-  const permitido = politicaPermiteSerial();
-  const mensagens = [];
-  if (enquadrado) mensagens.push("Visualização interna do VS Code: abra em outra aba para conectar a USB.");
-  else mensagens.push("Página aberta em aba própria do navegador.");
-  if (!seguro) mensagens.push("Origem não segura: use HTTPS ou localhost.");
-  else if (!serial) mensagens.push("Este navegador não oferece Web Serial. Use Chrome ou Edge no computador.");
-  else if (!permitido) mensagens.push("A prévia bloqueia a permissão de porta serial. Abra em outra aba.");
-  else mensagens.push("Web Serial disponível; falta escolher uma porta COM.");
-  el.statusAmbiente.textContent = mensagens.join(" ");
-}
-
-function indicador(elemento, mensagem, classe = "") {
-  elemento.textContent = mensagem;
-  elemento.className = `indicador ${classe}`.trim();
-}
-
-function formatarData(registro) {
-  const numero = Number(registro.timestamp);
-  // millis() da placa não representa data real.
-  if (Number.isFinite(numero) && numero >= 1577836800000 && numero <= Date.now() + 86400000) {
-    return new Date(numero).toLocaleString("pt-BR");
-  }
-  return [registro.data, registro.hora].filter(Boolean).join(" ") || "Sem data";
-}
-
-function ordenarRegistros(a, b) {
-  const ta = Number(a.timestamp);
-  const tb = Number(b.timestamp);
-  const va = Number.isFinite(ta) && ta >= 1577836800000;
-  const vb = Number.isFinite(tb) && tb >= 1577836800000;
-  if (va && vb) return tb - ta;
-  if (va !== vb) return va ? -1 : 1;
-  return b.id.localeCompare(a.id, "pt-BR", { numeric: true });
-}
-
-function celula(linha, texto) {
-  const td = document.createElement("td");
-  td.textContent = String(texto ?? "—");
-  linha.appendChild(td);
-  return td;
-}
-
-function renderizarHistorico() {
-  const busca = el.busca.value.trim().toLocaleLowerCase("pt-BR");
-  const status = el.filtro.value;
-  const filtrados = registros.filter(r => {
-    const coincide = `${r.nome || ""} ${r.uid || ""}`.toLocaleLowerCase("pt-BR").includes(busca);
-    return coincide && (status === "TODOS" || r.status === status);
-  });
-
-  el.tabela.replaceChildren();
-  if (!filtrados.length) {
-    const tr = document.createElement("tr");
-    const td = celula(tr, "Nenhum registro encontrado.");
-    td.colSpan = 5;
-    td.className = "vazio";
-    el.tabela.appendChild(tr);
-  } else {
-    const fragmento = document.createDocumentFragment();
-    filtrados.forEach(r => {
-      const tr = document.createElement("tr");
-      celula(tr, formatarData(r));
-      celula(tr, r.nome || "DESCONHECIDO");
-      celula(tr, r.uid || "—");
-      celula(tr, r.tipo || "—");
-      const td = document.createElement("td");
-      const badge = document.createElement("span");
-      badge.className = "etiqueta " + (r.status === "AUTORIZADO" ? "autorizado" : r.status === "NEGADO" ? "negado" : "outro");
-      badge.textContent = r.status || "SEM STATUS";
-      td.appendChild(badge);
-      tr.appendChild(td);
-      fragmento.appendChild(tr);
-    });
-    el.tabela.appendChild(fragmento);
-  }
-  el.info.textContent = `Exibindo ${filtrados.length} de ${registros.length} registros carregados.`;
-}
-
-async function carregarFirebase() {
-  if (atualizando || apagandoHistorico) return;
-  const versaoDaConsulta = versaoHistorico;
-  atualizando = true;
-  el.atualizar.disabled = true;
-  try {
-    const url = `${FIREBASE_URL}/registros.json?orderBy=%22%24key%22&limitToLast=${LIMITE_REGISTROS}`;
-    const controlador = new AbortController();
-    const limite = setTimeout(() => controlador.abort(), 9000);
-    let resposta;
-    try {
-      resposta = await fetch(url, { cache: "no-store", signal: controlador.signal });
-    } finally {
-      clearTimeout(limite);
-    }
-    if (!resposta.ok) {
-      const motivo = (await resposta.text()).slice(0, 180);
-      throw new Error(`HTTP ${resposta.status}: ${motivo}`);
-    }
-    const dados = await resposta.json();
-    // Evita que uma leitura antiga reapareça depois de apagar os registros.
-    if (apagandoHistorico || versaoDaConsulta !== versaoHistorico) return;
-    registros = Object.entries(dados || {})
-      .filter(([, r]) => r && typeof r === "object")
-      .map(([id, r]) => ({ ...r, id }))
-      .sort(ordenarRegistros);
-
-    el.total.textContent = registros.length;
-    el.autorizados.textContent = registros.filter(r => r.status === "AUTORIZADO").length;
-    el.negados.textContent = registros.filter(r => r.status === "NEGADO").length;
-    el.ultimo.textContent = registros[0]?.nome || "—";
-    renderizarHistorico();
-    indicador(el.firebase, "Conectado", "ok");
-    el.atualizado.textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
-    avisarErro("Firebase conectado e leitura de registros concluída.");
-  } catch (erro) {
-    if (apagandoHistorico || versaoDaConsulta !== versaoHistorico) return;
-    console.error("Erro ao ler Firebase:", erro);
-    indicador(el.firebase, "Falha no Firebase", "erro");
-    const detalhe = erro.message || String(erro);
-    let dica = detalhe;
-    if (detalhe.includes("401") || detalhe.includes("Permission denied")) {
-      dica = "Firebase HTTP 401: o banco bloqueou leitura sem autenticação. Use autenticação e regras adequadas; não deixe dados de alunos públicos.";
-    } else if (detalhe.includes("404")) {
-      dica = "Firebase HTTP 404: confira o endereço do Realtime Database.";
-    } else if (detalhe.includes("400")) {
-      dica = "Firebase HTTP 400: verifique os parâmetros da consulta e as regras de índice do banco.";
-    } else if (erro.name === "AbortError") {
-      dica = "Firebase demorou mais de 9 segundos para responder. Verifique a rede e a URL.";
-    } else if (erro instanceof TypeError) {
-      dica = "Falha de rede ao acessar o Firebase. Verifique conexão, bloqueios do navegador e URL.";
-    }
-    el.atualizado.textContent = dica;
-    avisarErro(dica);
-  } finally {
-    atualizando = false;
-    el.atualizar.disabled = false;
-  }
-}
-
-// ==========================================================
-// APAGAR HISTORICO DO FIREBASE (PROTOTIPO)
-// ==========================================================
-async function apagarHistoricoFirebase() {
-  if (apagandoHistorico) return;
-
-  const confirmou = window.confirm(
-    "ATENÇÃO: todos os registros de acesso serão excluídos permanentemente do Firebase, " +
-    "inclusive os que não aparecem na tabela. O site dos responsáveis também ficará sem esse histórico. Deseja continuar?"
-  );
-  if (!confirmou) return;
-
-  const palavra = window.prompt('Para confirmar a exclusão, digite APAGAR em letras maiúsculas:');
-  if (palavra !== "APAGAR") {
-    el.mensagemLimpeza.textContent = "Exclusão cancelada. Nenhum registro foi apagado.";
-    return;
-  }
-
-  apagandoHistorico = true;
-  versaoHistorico++;
-  el.apagarHistorico.disabled = true;
-  el.apagarHistorico.textContent = "Apagando...";
-  el.mensagemLimpeza.textContent = "Excluindo registros do Firebase...";
-  try {
-    const resposta = await fetch(`${FIREBASE_URL}/registros.json`, {
-      method: "DELETE",
-      cache: "no-store"
-    });
-    if (!resposta.ok) {
-      const detalhe = (await resposta.text()).slice(0, 160);
-      throw new Error(`HTTP ${resposta.status}${detalhe ? ": " + detalhe : ""}`);
-    }
-
-    registros = [];
-    el.total.textContent = "0";
-    el.autorizados.textContent = "0";
-    el.negados.textContent = "0";
-    el.ultimo.textContent = "—";
-    el.busca.value = "";
-    el.filtro.value = "TODOS";
-    renderizarHistorico();
-    el.mensagemLimpeza.textContent = "Histórico excluído do Firebase com sucesso.";
-    el.atualizado.textContent = `Histórico limpo às ${new Date().toLocaleTimeString("pt-BR")}`;
-    avisarErro("Histórico apagado. Novas leituras RFID continuarão gerando registros normalmente.");
-  } catch (erro) {
-    console.error("Falha ao apagar histórico:", erro);
-    el.mensagemLimpeza.textContent = `Não foi possível limpar o histórico: ${erro.message}. Verifique as permissões do Firebase.`;
-    avisarErro("Firebase: exclusão não autorizada ou falha de conexão. Não altere as regras de segurança para liberar acesso público.");
-  } finally {
-    apagandoHistorico = false;
-    el.apagarHistorico.disabled = false;
-    el.apagarHistorico.textContent = "Limpar histórico";
-    // Atualiza novamente, mas não concorre com uma consulta já em andamento.
-    if (!atualizando) void carregarFirebase();
-  }
-}
-
-// ==========================================================
-// MONITOR SERIAL: LOG E INTERPRETACAO DAS MENSAGENS DA ESP32
-// ==========================================================
-function log(mensagem) {
-  const hora = new Date().toLocaleTimeString("pt-BR");
-  logLinhas.push(`[${hora}] ${mensagem}`);
-  logLinhas = logLinhas.slice(-120);
-  el.log.textContent = logLinhas.join("\n");
-  el.log.scrollTop = el.log.scrollHeight;
-}
-
-function interpretarLinha(linha) {
-  log(linha);
-
-  if (linha.startsWith("PORTA:")) {
-    const aberta = linha.includes("ABERTA");
-    indicador(el.catraca, aberta ? "Catraca: liberada" : "Catraca: travada", aberta ? "ok" : "");
-  }
-
-  if (linha.startsWith("TAG:")) {
-    // TAG:UID:NOME:TIPO:AUTORIZADO
-    // TAG:UID:DESCONHECIDO:NEGADO
-    const partes = linha.split(":");
-    const status = partes[partes.length - 1] || "—";
-    const uid = partes[1] || "—";
-    const nome = partes[2] || "DESCONHECIDO";
-    el.ultimaTag.textContent = nome;
-    el.ultimoUID.textContent = uid;
-    el.ultimoStatus.textContent = status;
-  }
-}
-
-function navegadorSuportaSerial() {
-  atualizarDiagnosticoAmbiente();
-  if (estaEmPreview() && !politicaPermiteSerial()) {
-    indicador(el.serial, "Bloqueado na prévia", "erro");
-    el.mensagemSerial.textContent = "A janela embutida do VS Code bloqueia USB. Use 'Abrir site em outra aba'.";
-    avisarErro("USB: abra o endereço encaminhado pelo Codespaces em uma aba normal do Chrome/Edge.");
-    return false;
-  }
-  if (!politicaPermiteSerial()) {
-    indicador(el.serial, "Bloqueado", "erro");
-    el.mensagemSerial.textContent = "O site não recebeu permissão para usar a porta serial nesta página.";
-    avisarErro("USB: permissão 'serial' bloqueada pelo navegador ou pela página embutida.");
-    return false;
-  }
-  if (!("serial" in navigator)) {
-    indicador(el.serial, "Indisponível", "erro");
-    el.mensagemSerial.textContent = "Web Serial indisponível. Abra em Chrome ou Edge no computador, em HTTPS ou localhost.";
-    avisarErro("USB: navegador sem Web Serial. Teste em Chrome/Edge no Windows.");
-    return false;
-  }
-  if (!window.isSecureContext) {
-    indicador(el.serial, "Página não segura", "erro");
-    el.mensagemSerial.textContent = "A Web Serial exige HTTPS ou localhost. No Codespaces, use a URL HTTPS encaminhada.";
-    avisarErro("USB: esta página não está em um contexto seguro.");
-    return false;
-  }
-  return true;
-}
-
-function atualizarEstadoSerial(mensagem, tipo = "") {
-  indicador(el.serial, mensagem, tipo);
-  const ocupado = conectando || desconectando;
-  el.conectar.disabled = ocupado || Boolean(portaSerial);
-  el.reconectar.disabled = ocupado || Boolean(portaSerial);
-  el.desconectar.disabled = ocupado || !portaSerial;
-}
-
-function descreverErroSerial(erro) {
-  if (erro.name === "NotFoundError") {
-    return "Nenhuma porta selecionada. Clique em Conectar e escolha a porta COM da ESP32.";
-  }
-  if (erro.name === "SecurityError") {
-    return "Permissão de porta bloqueada. Abra o site numa aba própria no Chrome/Edge (fora do VS Code).";
-  }
-  if (erro.name === "InvalidStateError" || erro.name === "NetworkError") {
-    return "A porta pode estar ocupada. Feche o Monitor Serial e o Plotter Serial da Arduino IDE, confira a USB e tente novamente.";
-  }
-  return `Erro ao conectar: ${erro.message || String(erro)}`;
-}
-
-// A chamada requestPort() ocorre diretamente após o clique.
-// Isso é necessário para o navegador abrir a janela das portas COM.
-async function conectarESP32() {
-  if (portaSerial || conectando || desconectando || !navegadorSuportaSerial()) return;
-  conectando = true;
-  atualizarEstadoSerial("Escolhendo porta...");
-  el.mensagemSerial.textContent = "Selecione a porta COM correspondente à ESP32 na janela do navegador.";
-  try {
-    const escolhida = await navigator.serial.requestPort();
-    await abrirSerial(escolhida);
-  } catch (erro) {
-    const mensagem = descreverErroSerial(erro);
-    log(mensagem);
-    el.mensagemSerial.textContent = mensagem;
-    avisarErro("USB: " + mensagem);
-    atualizarEstadoSerial("Não conectado", "erro");
-  } finally {
-    conectando = false;
-    if (!portaSerial) atualizarEstadoSerial("Desconectado");
-    else atualizarEstadoSerial("Conectado", "ok");
-  }
-}
-
-async function reconectarESP32() {
-  if (portaSerial || conectando || desconectando || !navegadorSuportaSerial()) return;
-  conectando = true;
-  atualizarEstadoSerial("Reconectando...");
-  try {
-    const portas = await navigator.serial.getPorts();
-    if (portas.length !== 1) {
-      throw new Error(portas.length === 0
-        ? "Não há porta autorizada. Use Conectar ESP32 para escolher a COM."
-        : "Há mais de uma porta autorizada. Use Conectar ESP32 para escolher a correta.");
-    }
-    await abrirSerial(portas[0]);
-  } catch (erro) {
-    const mensagem = descreverErroSerial(erro);
-    log(mensagem);
-    el.mensagemSerial.textContent = mensagem;
-  } finally {
-    conectando = false;
-    atualizarEstadoSerial(portaSerial ? "Conectado" : "Desconectado", portaSerial ? "ok" : "");
-  }
-}
-
-async function abrirSerial(portaEscolhida) {
-  // Não abrir a mesma porta duas vezes.
-  if (portaSerial) return;
-  await portaEscolhida.open({ baudRate: BAUD_RATE, bufferSize: 4096 });
-  portaSerial = portaEscolhida;
-  pararLeitura = false;
-  const info = portaSerial.getInfo();
-  el.nomePorta.textContent = info.usbVendorId
-    ? `USB ${info.usbVendorId.toString(16).toUpperCase().padStart(4, "0")}:${(info.usbProductId || 0).toString(16).toUpperCase().padStart(4, "0")} (115200)`
-    : "Porta serial selecionada (115200)";
-  el.mensagemSerial.textContent = "Conectada! Aproxime uma tag RFID para testar a leitura.";
-  avisarErro("USB conectada com sucesso. Aguardando mensagens da ESP32.");
-  indicador(el.serial, "Conectado", "ok");
-  log("ESP32 conectada. Monitor serial iniciado em 115200 baud.");
-  // Lê continuamente, sem bloquear os botões da página.
-  tarefaLeitura = lerSerial(portaEscolhida);
-}
-
-async function lerSerial(porta) {
-  const decoder = new TextDecoder();
-  let parcial = "";
-  try {
-    while (!pararLeitura && porta.readable) {
-      const leitor = porta.readable.getReader();
-      leitorSerial = leitor;
-      let leituraTerminou = false;
-      try {
-        while (!pararLeitura) {
-          const { value, done } = await leitor.read();
-          if (done) { leituraTerminou = true; break; }
-          parcial += decoder.decode(value, { stream: true });
-          const linhas = parcial.split(/\r?\n/);
-          parcial = linhas.pop() || "";
-          for (const linha of linhas) {
-            if (linha.trim()) interpretarLinha(linha.trim().slice(0, 1000));
-          }
-          if (parcial.length > 3000) parcial = parcial.slice(-1000);
-        }
-      } catch (erro) {
-        if (!pararLeitura) log(`Falha de leitura serial: ${erro.message}`);
-        leituraTerminou = true;
-      } finally {
-        leitor.releaseLock();
-        if (leitorSerial === leitor) leitorSerial = null;
-      }
-      if (leituraTerminou || pararLeitura) break;
-    }
-  } finally {
-    if (parcial.trim()) interpretarLinha(parcial.trim().slice(0, 1000));
-    try { await porta.close(); } catch (erro) { console.warn("Fechamento da porta:", erro); }
-    if (portaSerial === porta) portaSerial = null;
-    pararLeitura = false;
-    desconectando = false;
-    el.nomePorta.textContent = "Nenhuma selecionada";
-    atualizarEstadoSerial("Desconectado");
-    el.mensagemSerial.textContent = "Porta desconectada. Clique em Conectar ESP32 para continuar.";
-    log("Monitor serial desconectado.");
-  }
-}
-
-async function desconectarESP32() {
-  if (!portaSerial || desconectando) return;
-  desconectando = true;
-  pararLeitura = true;
-  atualizarEstadoSerial("Desconectando...");
-  try {
-    if (leitorSerial) await leitorSerial.cancel();
-    if (tarefaLeitura) await tarefaLeitura;
-  } catch (erro) {
-    log(`Falha ao desconectar: ${erro.message}`);
-  } finally {
-    tarefaLeitura = null;
-    desconectando = false;
-    atualizarEstadoSerial(portaSerial ? "Conectado" : "Desconectado", portaSerial ? "ok" : "");
-  }
-}
-
-// Se o cabo for removido, encerra a conexão com segurança.
-if ("serial" in navigator) {
-  navigator.serial.addEventListener("disconnect", event => {
-    const removida = event.port || event.target;
-    if (removida === portaSerial) {
-      log("O dispositivo USB foi removido.");
-      pararLeitura = true;
-      if (leitorSerial) void leitorSerial.cancel().catch(() => {});
-    }
-  });
-}
-
-// ==========================================================
-// EVENTOS
-// ==========================================================
-el.busca.addEventListener("input", renderizarHistorico);
-el.filtro.addEventListener("change", renderizarHistorico);
-el.atualizar.addEventListener("click", carregarFirebase);
-el.apagarHistorico.addEventListener("click", apagarHistoricoFirebase);
-el.conectar.addEventListener("click", conectarESP32);
-el.reconectar.addEventListener("click", reconectarESP32);
-el.desconectar.addEventListener("click", desconectarESP32);
-el.limparLog.addEventListener("click", () => {
-  logLinhas = [];
-  el.log.textContent = "Monitor limpo. Aguardando novas mensagens...";
-});
-
-el.abaExterna.href = window.location.href;
-indicador(el.statusJS, "JavaScript carregado", "ok");
-atualizarDiagnosticoAmbiente();
-navegadorSuportaSerial();
-el.diagnosticar.addEventListener("click", () => {
-  atualizarDiagnosticoAmbiente();
-  navegadorSuportaSerial();
-  void carregarFirebase();
-});
-void carregarFirebase();
-setInterval(() => {
-  if (document.visibilityState === "visible") void carregarFirebase();
-}, INTERVALO_ATUALIZACAO);
-
-</script>
+  <footer>
+    EduTrack — Conectando escolas, alunos e famílias com inteligência e segurança.
+  </footer>
 </body>
 </html>

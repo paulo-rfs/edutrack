@@ -1,121 +1,194 @@
-// EDUTRACK - CONSULTA PARA RESPONSÁVEIS (PROTÓTIPO)
-// Para uso real é obrigatório exigir autenticação e autorização no servidor.
-const FIREBASE_URL = "https://presenciometro-escolar-default-rtdb.firebaseio.com";
 
-const form = document.getElementById("formConsulta");
-const entrada = document.getElementById("buscaAluno");
-const botao = document.getElementById("btnConsultar");
-const statusConsulta = document.getElementById("statusConsulta");
-const resumo = document.getElementById("resumoConsulta");
-const resultado = document.getElementById("resultadoConsulta");
+// EDUTRACK - CONSULTA DE PRESENÇA
+
+const FIREBASE_URL =
+  "https://presenciometro-escolar-default-rtdb.firebaseio.com";
+
+const el = (id) => document.getElementById(id);
 
 let ultimaBusca = "";
-let consultando = false;
+let ocupada = false;
 
-function normalizarNome(texto) {
-  return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+// ============================================
+// NORMALIZAR NOME E UID
+// ============================================
+
+function nomeNormalizado(v) {
+  return String(v || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .replace(/\s+/g, " ");
 }
 
-function normalizarUID(texto) {
-  return String(texto || "").toUpperCase().replace(/[^A-F0-9]/g, "");
+function uidNormalizado(v) {
+  return String(v || "")
+    .toUpperCase()
+    .replace(/[^0-9A-F]/g, "");
 }
 
-function formatarData(registro) {
-  const numero = Number(registro.timestamp);
-  if (Number.isFinite(numero) && numero >= 1577836800000 && numero <= Date.now() + 86400000) {
-    return new Date(numero).toLocaleString("pt-BR");
+// ============================================
+// FORMATAR DATA
+// ============================================
+
+function dataRegistro(r) {
+  const n = Number(r.timestamp);
+
+  if (
+    Number.isFinite(n) &&
+    n >= 1577836800000 &&
+    n < Date.now() + 86400000
+  ) {
+    return new Date(n).toLocaleString("pt-BR");
   }
-  return [registro.data, registro.hora].filter(Boolean).join(" ") || "Horário não informado";
+
+  return [r.data, r.hora].filter(Boolean).join(" ") ||
+    "Não informado";
 }
 
-function instanteValido(item) {
-  const valor = Number(item.timestamp);
-  return valor >= 1577836800000 ? valor : 0;
+function ordem(r) {
+  const n = Number(r.timestamp);
+
+  return Number.isFinite(n) && n >= 1577836800000
+    ? n
+    : 0;
 }
 
-function mensagemVazia(texto) {
-  const bloco = document.createElement("div");
-  bloco.className = "estado-vazio";
-  bloco.textContent = texto;
-  resultado.replaceChildren(bloco);
-}
+// ============================================
+// MOSTRAR RESULTADOS
+// ============================================
 
-function desenharResultado(registros) {
-  resultado.replaceChildren();
-  if (registros.length === 0) {
-    resumo.textContent = "Nenhum registro correspondente.";
-    mensagemVazia("Não foram encontrados registros com esse nome completo ou UID.");
+function mostrarResultados(lista) {
+  const caixa = el("resultadoConsulta");
+  caixa.replaceChildren();
+
+  el("resumoConsulta").textContent =
+    `${lista.length} registro(s) encontrado(s).`;
+
+  if (!lista.length) {
+    const p = document.createElement("p");
+
+    p.className = "vazio";
+    p.textContent =
+      "Nenhum registro com esse nome completo ou UID.";
+
+    caixa.append(p);
     return;
   }
-  const recentes = registros.slice(0, 20);
-  resumo.textContent = `${registros.length} registro(s) encontrado(s). Exibindo até 20.`;
 
-  recentes.forEach(registro => {
+  lista.slice(0, 30).forEach(r => {
     const item = document.createElement("article");
-    item.className = "item-registro";
-    const informacoes = document.createElement("div");
+    item.className = "item-resultado";
+
+    const info = document.createElement("div");
     const nome = document.createElement("strong");
-    nome.textContent = registro.nome || "DESCONHECIDO";
-    const detalhes = document.createElement("p");
-    detalhes.className = "detalhes";
-    detalhes.textContent = `${formatarData(registro)} • UID: ${registro.uid || "—"} • ${registro.tipo || "—"}`;
-    informacoes.append(nome, detalhes);
+
+    nome.textContent = r.nome || "DESCONHECIDO";
+
+    const detalhes = document.createElement("small");
+
+    detalhes.textContent =
+      `${dataRegistro(r)} • UID: ${r.uid || "—"} • ${r.tipo || "—"}`;
+
+    info.append(nome, detalhes);
 
     const etiqueta = document.createElement("span");
-    etiqueta.className = "etiqueta " + (registro.status === "AUTORIZADO" ? "autorizado" : registro.status === "NEGADO" ? "negado" : "outro");
-    etiqueta.textContent = registro.status || "SEM STATUS";
-    item.append(informacoes, etiqueta);
-    resultado.appendChild(item);
+
+    etiqueta.className =
+      "tag-status " +
+      (r.status === "AUTORIZADO" ? "autorizado" : "negado");
+
+    etiqueta.textContent = r.status || "SEM STATUS";
+
+    item.append(info, etiqueta);
+    caixa.append(item);
   });
 }
 
+// ============================================
+// CONSULTAR FIREBASE
+// ============================================
+
 async function consultar(termo) {
-  if (consultando) return;
-  consultando = true;
-  botao.disabled = true;
-  statusConsulta.textContent = "Consultando o Firebase...";
+  if (ocupada) return;
+
+  ocupada = true;
+  el("btnConsultar").disabled = true;
+
+  el("statusConsulta").textContent =
+    "Consultando o Firebase...";
 
   try {
-    // Consulta simples para DEMONSTRAÇÃO; lê o conjunto de registros do protótipo.
-    const resposta = await fetch(`${FIREBASE_URL}/registros.json`, { cache: "no-store" });
-    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+    const resposta = await fetch(
+      `${FIREBASE_URL}/registros.json`,
+      { cache: "no-store" }
+    );
+
+    if (!resposta.ok) {
+      throw new Error(`HTTP ${resposta.status}`);
+    }
+
     const dados = await resposta.json();
-    const buscaNome = normalizarNome(termo);
-    const buscaUID = normalizarUID(termo);
-    const registros = Object.entries(dados || {})
-      .filter(([, registro]) => registro && typeof registro === "object")
-      .filter(([, registro]) => {
-        const mesmoNome = normalizarNome(registro.nome) === buscaNome;
-        const mesmoUID = buscaUID.length >= 8 && normalizarUID(registro.uid) === buscaUID;
-        return mesmoNome || mesmoUID;
-      })
-      .map(([id, registro]) => ({ ...registro, id }))
-      .sort((a, b) => {
-        const diff = instanteValido(b) - instanteValido(a);
-        return diff || b.id.localeCompare(a.id, "pt-BR", { numeric: true });
-      });
+
+    const nomeBusca = nomeNormalizado(termo);
+    const uidBusca = uidNormalizado(termo);
+
+    const lista = Object.entries(dados || {})
+      .filter(([, r]) => r && typeof r === "object")
+      .filter(([, r]) =>
+        nomeNormalizado(r.nome) === nomeBusca ||
+        (
+          uidBusca.length >= 8 &&
+          uidNormalizado(r.uid) === uidBusca
+        )
+      )
+      .map(([id, r]) => ({ ...r, id }))
+      .sort(
+        (a, b) =>
+          ordem(b) - ordem(a) ||
+          b.id.localeCompare(a.id)
+      );
+
+    mostrarResultados(lista);
 
     ultimaBusca = termo;
-    desenharResultado(registros);
-    statusConsulta.textContent = `Consulta concluída às ${new Date().toLocaleTimeString("pt-BR")}.`;
+
+    el("statusConsulta").textContent =
+      `Consulta concluída às ${new Date().toLocaleTimeString("pt-BR")}.`;
+
   } catch (erro) {
-    console.error("Erro ao consultar:", erro);
-    statusConsulta.textContent = "Não foi possível consultar. Verifique a conexão e as regras do Firebase.";
-    resumo.textContent = "Erro na consulta.";
-    mensagemVazia("Falha ao carregar os registros.");
+    el("statusConsulta").textContent =
+      `Erro ao consultar: ${erro.message}. Verifique as regras do Firebase.`;
+
+    console.error(erro);
+
   } finally {
-    consultando = false;
-    botao.disabled = false;
+    ocupada = false;
+    el("btnConsultar").disabled = false;
   }
 }
 
-form.addEventListener("submit", evento => {
+// ============================================
+// BUSCA
+// ============================================
+
+el("formConsulta").addEventListener("submit", evento => {
   evento.preventDefault();
-  const termo = entrada.value.trim();
-  if (termo) void consultar(termo);
+
+  const busca = el("buscaAluno").value.trim();
+
+  if (busca) {
+    void consultar(busca);
+  }
 });
 
-// Atualização automática somente depois que a pessoa faz uma consulta.
+// Atualiza a consulta a cada 10 segundos.
 setInterval(() => {
-  if (ultimaBusca && document.visibilityState === "visible") void consultar(ultimaBusca);
+  if (
+    ultimaBusca &&
+    document.visibilityState === "visible"
+  ) {
+    void consultar(ultimaBusca);
+  }
 }, 10000);

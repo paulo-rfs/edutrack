@@ -1,364 +1,454 @@
-// ==========================================================
-// EDUTRACK - PAINEL DA ESCOLA (VS CODE / LIVE SERVER)
-// Web Serial: Chrome ou Edge, em localhost ou HTTPS.
-// ==========================================================
-const FIREBASE_URL = "https://presenciometro-escolar-default-rtdb.firebaseio.com";
-const INTERVALO_ATUALIZACAO = 3000;
-const LIMITE_REGISTROS = 200;
-const BAUD_RATE = 115200; // Mesmo valor de Serial.begin(115200) na ESP32
 
-const el = {
-  tabela: document.getElementById("tabelaRegistros"),
-  busca: document.getElementById("filtroBusca"),
-  filtro: document.getElementById("filtroStatus"),
-  total: document.getElementById("totalRegistros"),
-  autorizados: document.getElementById("totalAutorizados"),
-  negados: document.getElementById("totalNegados"),
-  ultimo: document.getElementById("ultimoAcesso"),
-  firebase: document.getElementById("statusFirebase"),
-  atualizado: document.getElementById("atualizadoEm"),
-  info: document.getElementById("infoTabela"),
-  atualizar: document.getElementById("btnAtualizar"),
-  conectar: document.getElementById("btnConectar"),
-  reconectar: document.getElementById("btnReconectar"),
-  desconectar: document.getElementById("btnDesconectar"),
-  serial: document.getElementById("statusSerial"),
-  mensagemSerial: document.getElementById("mensagemSerial"),
-  nomePorta: document.getElementById("nomePortaSerial"),
-  log: document.getElementById("logSerial"),
-  limparLog: document.getElementById("btnLimparLog"),
-  ultimaTag: document.getElementById("ultimaTagSerial"),
-  ultimoUID: document.getElementById("ultimoUidSerial"),
-  ultimoStatus: document.getElementById("ultimoStatusSerial"),
-  catraca: document.getElementById("statusCatraca")
-};
+// EDUTRACK - PAINEL DA ESCOLA
+
+const FIREBASE_URL = "https://presenciometro-escolar-default-rtdb.firebaseio.com";
+const LIMITE_TELA = 200;
+
+const el = (id) => document.getElementById(id);
 
 let registros = [];
-let atualizando = false;
-let portaSerial = null;
-let leitorSerial = null;
-let tarefaLeitura = null;
-let pararLeitura = false;
-let conectando = false;
-let desconectando = false;
-let logLinhas = [];
+let carregando = false;
+let apagando = false;
 
-// ==========================================================
-// FIREBASE / HISTORICO
-// ==========================================================
-function indicador(elemento, mensagem, classe = "") {
-  elemento.textContent = mensagem;
-  elemento.className = `indicador ${classe}`.trim();
+let porta = null;
+let leitor = null;
+let lendo = false;
+let mensagens = [];
+
+// ============================================
+// MENSAGENS E STATUS
+// ============================================
+
+function avisar(texto, erro = false) {
+  el("mensagemSistema").textContent = texto;
+  el("mensagemSistema").className =
+    "mensagem " + (erro ? "erro" : "ok");
 }
 
-function formatarData(registro) {
-  const numero = Number(registro.timestamp);
-  // millis() da placa não representa data real.
-  if (Number.isFinite(numero) && numero >= 1577836800000 && numero <= Date.now() + 86400000) {
+function status(elemento, texto, tipo = "") {
+  elemento.textContent = texto;
+  elemento.className = "status " + tipo;
+}
+
+// ============================================
+// DATA E HORA
+// ============================================
+
+function horaRegistro(r) {
+  const numero = Number(r.timestamp);
+
+  if (
+    Number.isFinite(numero) &&
+    numero >= 1577836800000 &&
+    numero < Date.now() + 86400000
+  ) {
     return new Date(numero).toLocaleString("pt-BR");
   }
-  return [registro.data, registro.hora].filter(Boolean).join(" ") || "Sem data";
+
+  return [r.data, r.hora].filter(Boolean).join(" ") ||
+    "Não informado";
 }
 
-function ordenarRegistros(a, b) {
-  const ta = Number(a.timestamp);
-  const tb = Number(b.timestamp);
-  const va = Number.isFinite(ta) && ta >= 1577836800000;
-  const vb = Number.isFinite(tb) && tb >= 1577836800000;
-  if (va && vb) return tb - ta;
-  if (va !== vb) return va ? -1 : 1;
-  return b.id.localeCompare(a.id, "pt-BR", { numeric: true });
+function dataOrdenacao(r) {
+  const n = Number(r.timestamp);
+
+  return Number.isFinite(n) && n >= 1577836800000
+    ? n
+    : 0;
 }
 
-function celula(linha, texto) {
+// ============================================
+// TABELA
+// ============================================
+
+function celula(tr, valor) {
   const td = document.createElement("td");
-  td.textContent = String(texto ?? "—");
-  linha.appendChild(td);
+  td.textContent = String(valor ?? "—");
+  tr.append(td);
+
   return td;
 }
 
-function renderizarHistorico() {
-  const busca = el.busca.value.trim().toLocaleLowerCase("pt-BR");
-  const status = el.filtro.value;
-  const filtrados = registros.filter(r => {
-    const coincide = `${r.nome || ""} ${r.uid || ""}`.toLocaleLowerCase("pt-BR").includes(busca);
-    return coincide && (status === "TODOS" || r.status === status);
-  });
+function renderizar() {
+  const busca = el("filtroBusca")
+    .value.trim()
+    .toLocaleLowerCase("pt-BR");
 
-  el.tabela.replaceChildren();
-  if (!filtrados.length) {
+  const situacao = el("filtroStatus").value;
+
+  const visiveis = registros.filter(r =>
+    (situacao === "TODOS" || r.status === situacao) &&
+    `${r.nome || ""} ${r.uid || ""}`
+      .toLocaleLowerCase("pt-BR")
+      .includes(busca)
+  );
+
+  const corpo = el("tabelaRegistros");
+  corpo.replaceChildren();
+
+  if (!visiveis.length) {
     const tr = document.createElement("tr");
-    const td = celula(tr, "Nenhum registro encontrado.");
-    td.colSpan = 5;
-    td.className = "vazio";
-    el.tabela.appendChild(tr);
+
+    celula(tr, "Nenhum registro encontrado.").colSpan = 5;
+    tr.firstChild.className = "vazio";
+
+    corpo.append(tr);
   } else {
     const fragmento = document.createDocumentFragment();
-    filtrados.forEach(r => {
+
+    visiveis.forEach(r => {
       const tr = document.createElement("tr");
-      celula(tr, formatarData(r));
+
+      celula(tr, horaRegistro(r));
       celula(tr, r.nome || "DESCONHECIDO");
-      celula(tr, r.uid || "—");
-      celula(tr, r.tipo || "—");
+      celula(tr, r.uid);
+      celula(tr, r.tipo);
+
       const td = document.createElement("td");
-      const badge = document.createElement("span");
-      badge.className = "etiqueta " + (r.status === "AUTORIZADO" ? "autorizado" : r.status === "NEGADO" ? "negado" : "outro");
-      badge.textContent = r.status || "SEM STATUS";
-      td.appendChild(badge);
-      tr.appendChild(td);
-      fragmento.appendChild(tr);
+      const etiqueta = document.createElement("span");
+
+      etiqueta.className =
+        "tag-status " +
+        (r.status === "AUTORIZADO"
+          ? "autorizado"
+          : r.status === "NEGADO"
+            ? "negado"
+            : "");
+
+      etiqueta.textContent = r.status || "SEM STATUS";
+
+      td.append(etiqueta);
+      tr.append(td);
+      fragmento.append(tr);
     });
-    el.tabela.appendChild(fragmento);
+
+    corpo.append(fragmento);
   }
-  el.info.textContent = `Exibindo ${filtrados.length} de ${registros.length} registros carregados.`;
+
+  el("totalRegistros").textContent = registros.length;
+
+  el("totalAutorizados").textContent =
+    registros.filter(r => r.status === "AUTORIZADO").length;
+
+  el("totalNegados").textContent =
+    registros.filter(r => r.status === "NEGADO").length;
+
+  el("ultimoAcesso").textContent =
+    registros[0]?.nome || "—";
+
+  el("infoTabela").textContent =
+    `Mostrando ${visiveis.length} de ${registros.length} registros carregados (limite de ${LIMITE_TELA} na tela).`;
 }
 
-async function carregarFirebase() {
-  if (atualizando) return;
-  atualizando = true;
-  el.atualizar.disabled = true;
+// ============================================
+// CARREGAR FIREBASE
+// ============================================
+
+async function carregarRegistros() {
+  if (carregando || apagando) return;
+
+  carregando = true;
+  el("btnAtualizar").disabled = true;
+
   try {
-    const url = `${FIREBASE_URL}/registros.json?orderBy=%22%24key%22&limitToLast=${LIMITE_REGISTROS}`;
-    const resposta = await fetch(url, { cache: "no-store" });
-    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+    const resposta = await fetch(
+      `${FIREBASE_URL}/registros.json`,
+      { cache: "no-store" }
+    );
+
+    if (!resposta.ok) {
+      throw new Error(
+        `Firebase retornou HTTP ${resposta.status}`
+      );
+    }
+
     const dados = await resposta.json();
+
     registros = Object.entries(dados || {})
       .filter(([, r]) => r && typeof r === "object")
       .map(([id, r]) => ({ ...r, id }))
-      .sort(ordenarRegistros);
+      .sort(
+        (a, b) =>
+          dataOrdenacao(b) - dataOrdenacao(a) ||
+          b.id.localeCompare(a.id)
+      )
+      .slice(0, LIMITE_TELA);
 
-    el.total.textContent = registros.length;
-    el.autorizados.textContent = registros.filter(r => r.status === "AUTORIZADO").length;
-    el.negados.textContent = registros.filter(r => r.status === "NEGADO").length;
-    el.ultimo.textContent = registros[0]?.nome || "—";
-    renderizarHistorico();
-    indicador(el.firebase, "Conectado", "ok");
-    el.atualizado.textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+    renderizar();
+
+    status(el("statusFirebase"), "Conectado", "ok");
+
+    el("atualizadoEm").textContent =
+      `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+
   } catch (erro) {
-    console.error("Erro ao ler Firebase:", erro);
-    indicador(el.firebase, "Falha no Firebase", "erro");
-    el.atualizado.textContent = "Verifique URL, internet e permissões do banco.";
+    console.error(erro);
+
+    status(el("statusFirebase"), "Erro", "erro");
+
+    avisar(
+      `Falha ao carregar o Firebase: ${erro.message}. Confira as regras de leitura.`,
+      true
+    );
+
   } finally {
-    atualizando = false;
-    el.atualizar.disabled = false;
+    carregando = false;
+    el("btnAtualizar").disabled = false;
   }
 }
 
-// ==========================================================
-// MONITOR SERIAL: LOG E INTERPRETACAO DAS MENSAGENS DA ESP32
-// ==========================================================
-function log(mensagem) {
-  const hora = new Date().toLocaleTimeString("pt-BR");
-  logLinhas.push(`[${hora}] ${mensagem}`);
-  logLinhas = logLinhas.slice(-120);
-  el.log.textContent = logLinhas.join("\n");
-  el.log.scrollTop = el.log.scrollHeight;
-}
+// ============================================
+// LIMPAR HISTORICO DO FIREBASE
+// ============================================
 
-function interpretarLinha(linha) {
-  log(linha);
+async function limparHistorico() {
+  if (apagando) return;
 
-  if (linha.startsWith("PORTA:")) {
-    const aberta = linha.includes("ABERTA");
-    indicador(el.catraca, aberta ? "Catraca: liberada" : "Catraca: travada", aberta ? "ok" : "");
+  const confirmacao = prompt(
+    "ATENÇÃO: apagar TODOS os registros do Firebase é irreversível.\nDigite APAGAR para continuar:"
+  );
+
+  if (confirmacao !== "APAGAR") return;
+
+  if (!confirm(
+    "Confirma a exclusão de TODO o histórico do EduTrack no Firebase?"
+  )) {
+    return;
   }
 
-  if (linha.startsWith("TAG:")) {
-    // TAG:UID:NOME:TIPO:AUTORIZADO
-    // TAG:UID:DESCONHECIDO:NEGADO
-    const partes = linha.split(":");
-    const status = partes[partes.length - 1] || "—";
-    const uid = partes[1] || "—";
-    const nome = partes[2] || "DESCONHECIDO";
-    el.ultimaTag.textContent = nome;
-    el.ultimoUID.textContent = uid;
-    el.ultimoStatus.textContent = status;
-  }
-}
+  apagando = true;
+  el("btnLimparHistorico").disabled = true;
 
-function navegadorSuportaSerial() {
-  if (!("serial" in navigator)) {
-    indicador(el.serial, "Indisponível", "erro");
-    el.mensagemSerial.textContent = "Web Serial não está disponível. Abra no Chrome ou Edge para computador, pelo Live Server.";
-    return false;
-  }
-  if (!window.isSecureContext) {
-    indicador(el.serial, "Página não segura", "erro");
-    el.mensagemSerial.textContent = "Abra o site no Live Server: http://localhost:5500/index.html (ou em HTTPS).";
-    return false;
-  }
-  return true;
-}
+  avisar("Apagando histórico do Firebase...");
 
-function atualizarEstadoSerial(mensagem, tipo = "") {
-  indicador(el.serial, mensagem, tipo);
-  const ocupado = conectando || desconectando;
-  el.conectar.disabled = ocupado || Boolean(portaSerial);
-  el.reconectar.disabled = ocupado || Boolean(portaSerial);
-  el.desconectar.disabled = ocupado || !portaSerial;
-}
-
-function descreverErroSerial(erro) {
-  if (erro.name === "NotFoundError") {
-    return "Nenhuma porta selecionada. Clique em Conectar e escolha a porta COM da ESP32.";
-  }
-  if (erro.name === "SecurityError") {
-    return "O navegador bloqueou o acesso à porta. Use Chrome/Edge em localhost ou HTTPS e permita a conexão.";
-  }
-  if (erro.name === "InvalidStateError" || erro.name === "NetworkError") {
-    return "A porta pode estar ocupada. Feche o Monitor Serial e o Plotter Serial da Arduino IDE, confira a USB e tente novamente.";
-  }
-  return `Erro ao conectar: ${erro.message || String(erro)}`;
-}
-
-// A chamada requestPort() ocorre diretamente após o clique.
-// Isso é necessário para o navegador abrir a janela das portas COM.
-async function conectarESP32() {
-  if (portaSerial || conectando || desconectando || !navegadorSuportaSerial()) return;
-  conectando = true;
-  atualizarEstadoSerial("Escolhendo porta...");
-  el.mensagemSerial.textContent = "Selecione a porta COM correspondente à ESP32 na janela do navegador.";
   try {
-    const escolhida = await navigator.serial.requestPort();
-    await abrirSerial(escolhida);
-  } catch (erro) {
-    const mensagem = descreverErroSerial(erro);
-    log(mensagem);
-    el.mensagemSerial.textContent = mensagem;
-    atualizarEstadoSerial("Não conectado", "erro");
-  } finally {
-    conectando = false;
-    if (!portaSerial) atualizarEstadoSerial("Desconectado");
-    else atualizarEstadoSerial("Conectado", "ok");
-  }
-}
+    const resposta = await fetch(
+      `${FIREBASE_URL}/registros.json`,
+      { method: "DELETE" }
+    );
 
-async function reconectarESP32() {
-  if (portaSerial || conectando || desconectando || !navegadorSuportaSerial()) return;
-  conectando = true;
-  atualizarEstadoSerial("Reconectando...");
-  try {
-    const portas = await navigator.serial.getPorts();
-    if (portas.length !== 1) {
-      throw new Error(portas.length === 0
-        ? "Não há porta autorizada. Use Conectar ESP32 para escolher a COM."
-        : "Há mais de uma porta autorizada. Use Conectar ESP32 para escolher a correta.");
+    if (!resposta.ok) {
+      throw new Error(
+        `HTTP ${resposta.status}: ${await resposta.text()}`
+      );
     }
-    await abrirSerial(portas[0]);
+
+    registros = [];
+    renderizar();
+
+    avisar(
+      "Histórico apagado do Firebase. Novas leituras serão registradas normalmente."
+    );
+
+    await carregarAposExclusao();
+
   } catch (erro) {
-    const mensagem = descreverErroSerial(erro);
-    log(mensagem);
-    el.mensagemSerial.textContent = mensagem;
+    console.error(erro);
+
+    avisar(
+      `Não foi possível apagar: ${erro.message}. Verifique as permissões de escrita do Firebase.`,
+      true
+    );
+
   } finally {
-    conectando = false;
-    atualizarEstadoSerial(portaSerial ? "Conectado" : "Desconectado", portaSerial ? "ok" : "");
+    apagando = false;
+    el("btnLimparHistorico").disabled = false;
   }
 }
 
-async function abrirSerial(portaEscolhida) {
-  // Não abrir a mesma porta duas vezes.
-  if (portaSerial) return;
-  await portaEscolhida.open({ baudRate: BAUD_RATE, bufferSize: 4096 });
-  portaSerial = portaEscolhida;
-  pararLeitura = false;
-  const info = portaSerial.getInfo();
-  el.nomePorta.textContent = info.usbVendorId
-    ? `USB ${info.usbVendorId.toString(16).toUpperCase().padStart(4, "0")}:${(info.usbProductId || 0).toString(16).toUpperCase().padStart(4, "0")} (115200)`
-    : "Porta serial selecionada (115200)";
-  el.mensagemSerial.textContent = "Conectada! Aproxime uma tag RFID para testar a leitura.";
-  indicador(el.serial, "Conectado", "ok");
-  log("ESP32 conectada. Monitor serial iniciado em 115200 baud.");
-  // Lê continuamente, sem bloquear os botões da página.
-  tarefaLeitura = lerSerial(portaEscolhida);
+async function carregarAposExclusao() {
+  el("atualizadoEm").textContent =
+    `Histórico limpo às ${new Date().toLocaleTimeString("pt-BR")}`;
 }
 
-async function lerSerial(porta) {
-  const decoder = new TextDecoder();
-  let parcial = "";
+// ============================================
+// MONITOR SERIAL
+// ============================================
+
+function log(mensagem) {
+  mensagens.push(
+    `[${new Date().toLocaleTimeString("pt-BR")}] ${mensagem}`
+  );
+
+  mensagens = mensagens.slice(-80);
+
+  el("logSerial").textContent = mensagens.join("\n");
+  el("logSerial").scrollTop = el("logSerial").scrollHeight;
+}
+
+function botoesSerial() {
+  el("btnConectar").disabled = !!porta;
+  el("btnDesconectar").disabled = !porta;
+
+  status(
+    el("statusSerial"),
+    porta ? "Conectada" : "Desconectada",
+    porta ? "ok" : ""
+  );
+}
+
+// ============================================
+// LER MENSAGENS DA ESP32
+// ============================================
+
+async function lerSerial() {
+  const decodificador = new TextDecoder();
+  let textoPendente = "";
+
   try {
-    while (!pararLeitura && porta.readable) {
-      const leitor = porta.readable.getReader();
-      leitorSerial = leitor;
-      let leituraTerminou = false;
+    while (lendo && porta?.readable) {
+      leitor = porta.readable.getReader();
+
       try {
-        while (!pararLeitura) {
+        while (lendo) {
           const { value, done } = await leitor.read();
-          if (done) { leituraTerminou = true; break; }
-          parcial += decoder.decode(value, { stream: true });
-          const linhas = parcial.split(/\r?\n/);
-          parcial = linhas.pop() || "";
-          for (const linha of linhas) {
-            if (linha.trim()) interpretarLinha(linha.trim().slice(0, 1000));
-          }
-          if (parcial.length > 3000) parcial = parcial.slice(-1000);
+
+          if (done) break;
+
+          textoPendente += decodificador.decode(
+            value,
+            { stream: true }
+          );
+
+          const linhas = textoPendente.split(/\r?\n/);
+          textoPendente = linhas.pop() || "";
+
+          linhas.forEach(linha => {
+            if (linha.trim()) log(linha.trim());
+          });
         }
-      } catch (erro) {
-        if (!pararLeitura) log(`Falha de leitura serial: ${erro.message}`);
-        leituraTerminou = true;
+
       } finally {
         leitor.releaseLock();
-        if (leitorSerial === leitor) leitorSerial = null;
+        leitor = null;
       }
-      if (leituraTerminou || pararLeitura) break;
     }
+
+  } catch (erro) {
+    if (lendo) {
+      log(`Erro de leitura: ${erro.message}`);
+    }
+
   } finally {
-    if (parcial.trim()) interpretarLinha(parcial.trim().slice(0, 1000));
-    try { await porta.close(); } catch (erro) { console.warn("Fechamento da porta:", erro); }
-    if (portaSerial === porta) portaSerial = null;
-    pararLeitura = false;
-    desconectando = false;
-    el.nomePorta.textContent = "Nenhuma selecionada";
-    atualizarEstadoSerial("Desconectado");
-    el.mensagemSerial.textContent = "Porta desconectada. Clique em Conectar ESP32 para continuar.";
-    log("Monitor serial desconectado.");
+    lendo = false;
+
+    if (porta) {
+      try {
+        await porta.close();
+      } catch (erro) {
+        console.warn(erro);
+      }
+
+      porta = null;
+    }
+
+    botoesSerial();
+    log("Porta serial desconectada.");
   }
 }
+
+// ============================================
+// CONECTAR ESP32
+// ============================================
+
+async function conectarESP32() {
+  if (!("serial" in navigator)) {
+    avisar(
+      "Este navegador não permite Web Serial. Abra o site em uma aba normal do Chrome/Edge no computador, usando HTTPS ou localhost.",
+      true
+    );
+
+    return;
+  }
+
+  try {
+    const selecionada = await navigator.serial.requestPort();
+
+    await selecionada.open({
+      baudRate: 115200
+    });
+
+    porta = selecionada;
+    lendo = true;
+
+    botoesSerial();
+
+    avisar("ESP32 conectada. Monitor serial ativo.");
+    log("ESP32 conectada em 115200 baud.");
+
+    void lerSerial();
+
+  } catch (erro) {
+    if (erro.name !== "NotFoundError") {
+      avisar(
+        `Erro ao conectar: ${erro.message}. Feche o Monitor Serial da Arduino IDE.`,
+        true
+      );
+    }
+  }
+}
+
+// ============================================
+// DESCONECTAR ESP32
+// ============================================
 
 async function desconectarESP32() {
-  if (!portaSerial || desconectando) return;
-  desconectando = true;
-  pararLeitura = true;
-  atualizarEstadoSerial("Desconectando...");
-  try {
-    if (leitorSerial) await leitorSerial.cancel();
-    if (tarefaLeitura) await tarefaLeitura;
-  } catch (erro) {
-    log(`Falha ao desconectar: ${erro.message}`);
-  } finally {
-    tarefaLeitura = null;
-    desconectando = false;
-    atualizarEstadoSerial(portaSerial ? "Conectado" : "Desconectado", portaSerial ? "ok" : "");
+  lendo = false;
+
+  if (leitor) {
+    try {
+      await leitor.cancel();
+    } catch (erro) {
+      console.warn(erro);
+    }
   }
 }
 
-// Se o cabo for removido, encerra a conexão com segurança.
-if ("serial" in navigator) {
-  navigator.serial.addEventListener("disconnect", event => {
-    const removida = event.port || event.target;
-    if (removida === portaSerial) {
-      log("O dispositivo USB foi removido.");
-      pararLeitura = true;
-      if (leitorSerial) void leitorSerial.cancel().catch(() => {});
-    }
-  });
-}
+// ============================================
+// EVENTOS DOS BOTOES
+// ============================================
 
-// ==========================================================
-// EVENTOS
-// ==========================================================
-el.busca.addEventListener("input", renderizarHistorico);
-el.filtro.addEventListener("change", renderizarHistorico);
-el.atualizar.addEventListener("click", carregarFirebase);
-el.conectar.addEventListener("click", conectarESP32);
-el.reconectar.addEventListener("click", reconectarESP32);
-el.desconectar.addEventListener("click", desconectarESP32);
-el.limparLog.addEventListener("click", () => {
-  logLinhas = [];
-  el.log.textContent = "Monitor limpo. Aguardando novas mensagens...";
+el("filtroBusca").addEventListener(
+  "input",
+  renderizar
+);
+
+el("filtroStatus").addEventListener(
+  "change",
+  renderizar
+);
+
+el("btnAtualizar").addEventListener(
+  "click",
+  carregarRegistros
+);
+
+el("btnLimparHistorico").addEventListener(
+  "click",
+  limparHistorico
+);
+
+el("btnConectar").addEventListener(
+  "click",
+  conectarESP32
+);
+
+el("btnDesconectar").addEventListener(
+  "click",
+  desconectarESP32
+);
+
+el("btnLimparLog").addEventListener("click", () => {
+  mensagens = [];
+
+  el("logSerial").textContent =
+    "Mensagens limpas. Aguardando novas leituras...";
 });
 
-navegadorSuportaSerial();
-void carregarFirebase();
-setInterval(() => {
-  if (document.visibilityState === "visible") void carregarFirebase();
-}, INTERVALO_ATUALIZACAO);
+// ============================================
+// INICIAR
+// ============================================
+
+void carregarRegistros();
+
+setInterval(carregarRegistros, 3000);
