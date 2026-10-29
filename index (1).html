@@ -67,7 +67,11 @@ p { margin: 0; }
 .botao:hover:not(:disabled) { background: var(--azul-escuro); }
 .botao-secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
 .botao-secundario:hover:not(:disabled) { background: #f4f7fb; }
-.texto-suave { color: var(--suave); font-size: 13px; }
+ .texto-suave { color: var(--suave); font-size: 13px; }
+.botao-perigo { background: #b42318; border-color: #b42318; }
+.botao-perigo:hover:not(:disabled) { background: #8f1d14; }
+.acoes-historico { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
 
 .secao-tabela { padding: 24px; margin-bottom: 18px; }
 .secao-titulo { margin-bottom: 21px; }
@@ -261,7 +265,11 @@ tr:last-child td { border-bottom: 0; }
     <section class="cartao secao-tabela">
       <div class="secao-titulo">
         <div><h2>Histórico de acessos</h2><p>Eventos armazenados no Firebase.</p></div>
+        <div class="acoes-historico">
+          <button id="btnApagarHistorico" class="botao botao-perigo" type="button" title="Excluir todos os registros armazenados no Firebase">Limpar histórico</button>
+        </div>
       </div>
+      <p id="mensagemLimpeza" class="texto-suave" role="status" aria-live="polite" style="margin-bottom:14px">A exclusão apaga os registros do Firebase e também os remove do site de consulta.</p>
       <div class="filtros">
         <label class="campo">Buscar por nome ou UID
           <input id="filtroBusca" type="search" placeholder="Ex.: Gabriel ou A3 77 2B 14" autocomplete="off">
@@ -320,6 +328,8 @@ const el = {
   atualizado: document.getElementById("atualizadoEm"),
   info: document.getElementById("infoTabela"),
   atualizar: document.getElementById("btnAtualizar"),
+  apagarHistorico: document.getElementById("btnApagarHistorico"),
+  mensagemLimpeza: document.getElementById("mensagemLimpeza"),
   conectar: document.getElementById("btnConectar"),
   reconectar: document.getElementById("btnReconectar"),
   desconectar: document.getElementById("btnDesconectar"),
@@ -341,6 +351,8 @@ const el = {
 
 let registros = [];
 let atualizando = false;
+let apagandoHistorico = false;
+let versaoHistorico = 0;
 let portaSerial = null;
 let leitorSerial = null;
 let tarefaLeitura = null;
@@ -452,7 +464,8 @@ function renderizarHistorico() {
 }
 
 async function carregarFirebase() {
-  if (atualizando) return;
+  if (atualizando || apagandoHistorico) return;
+  const versaoDaConsulta = versaoHistorico;
   atualizando = true;
   el.atualizar.disabled = true;
   try {
@@ -470,6 +483,8 @@ async function carregarFirebase() {
       throw new Error(`HTTP ${resposta.status}: ${motivo}`);
     }
     const dados = await resposta.json();
+    // Evita que uma leitura antiga reapareça depois de apagar os registros.
+    if (apagandoHistorico || versaoDaConsulta !== versaoHistorico) return;
     registros = Object.entries(dados || {})
       .filter(([, r]) => r && typeof r === "object")
       .map(([id, r]) => ({ ...r, id }))
@@ -484,6 +499,7 @@ async function carregarFirebase() {
     el.atualizado.textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
     avisarErro("Firebase conectado e leitura de registros concluída.");
   } catch (erro) {
+    if (apagandoHistorico || versaoDaConsulta !== versaoHistorico) return;
     console.error("Erro ao ler Firebase:", erro);
     indicador(el.firebase, "Falha no Firebase", "erro");
     const detalhe = erro.message || String(erro);
@@ -504,6 +520,63 @@ async function carregarFirebase() {
   } finally {
     atualizando = false;
     el.atualizar.disabled = false;
+  }
+}
+
+// ==========================================================
+// APAGAR HISTORICO DO FIREBASE (PROTOTIPO)
+// ==========================================================
+async function apagarHistoricoFirebase() {
+  if (apagandoHistorico) return;
+
+  const confirmou = window.confirm(
+    "ATENÇÃO: todos os registros de acesso serão excluídos permanentemente do Firebase, " +
+    "inclusive os que não aparecem na tabela. O site dos responsáveis também ficará sem esse histórico. Deseja continuar?"
+  );
+  if (!confirmou) return;
+
+  const palavra = window.prompt('Para confirmar a exclusão, digite APAGAR em letras maiúsculas:');
+  if (palavra !== "APAGAR") {
+    el.mensagemLimpeza.textContent = "Exclusão cancelada. Nenhum registro foi apagado.";
+    return;
+  }
+
+  apagandoHistorico = true;
+  versaoHistorico++;
+  el.apagarHistorico.disabled = true;
+  el.apagarHistorico.textContent = "Apagando...";
+  el.mensagemLimpeza.textContent = "Excluindo registros do Firebase...";
+  try {
+    const resposta = await fetch(`${FIREBASE_URL}/registros.json`, {
+      method: "DELETE",
+      cache: "no-store"
+    });
+    if (!resposta.ok) {
+      const detalhe = (await resposta.text()).slice(0, 160);
+      throw new Error(`HTTP ${resposta.status}${detalhe ? ": " + detalhe : ""}`);
+    }
+
+    registros = [];
+    el.total.textContent = "0";
+    el.autorizados.textContent = "0";
+    el.negados.textContent = "0";
+    el.ultimo.textContent = "—";
+    el.busca.value = "";
+    el.filtro.value = "TODOS";
+    renderizarHistorico();
+    el.mensagemLimpeza.textContent = "Histórico excluído do Firebase com sucesso.";
+    el.atualizado.textContent = `Histórico limpo às ${new Date().toLocaleTimeString("pt-BR")}`;
+    avisarErro("Histórico apagado. Novas leituras RFID continuarão gerando registros normalmente.");
+  } catch (erro) {
+    console.error("Falha ao apagar histórico:", erro);
+    el.mensagemLimpeza.textContent = `Não foi possível limpar o histórico: ${erro.message}. Verifique as permissões do Firebase.`;
+    avisarErro("Firebase: exclusão não autorizada ou falha de conexão. Não altere as regras de segurança para liberar acesso público.");
+  } finally {
+    apagandoHistorico = false;
+    el.apagarHistorico.disabled = false;
+    el.apagarHistorico.textContent = "Limpar histórico";
+    // Atualiza novamente, mas não concorre com uma consulta já em andamento.
+    if (!atualizando) void carregarFirebase();
   }
 }
 
@@ -729,6 +802,7 @@ if ("serial" in navigator) {
 el.busca.addEventListener("input", renderizarHistorico);
 el.filtro.addEventListener("change", renderizarHistorico);
 el.atualizar.addEventListener("click", carregarFirebase);
+el.apagarHistorico.addEventListener("click", apagarHistoricoFirebase);
 el.conectar.addEventListener("click", conectarESP32);
 el.reconectar.addEventListener("click", reconectarESP32);
 el.desconectar.addEventListener("click", desconectarESP32);
